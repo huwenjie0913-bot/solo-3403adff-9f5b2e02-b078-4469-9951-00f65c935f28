@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>工艺单打印</title>
+<style>
+  body { font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; margin: 24px; color: #222; }
+  .loading { color: #777; }
+  canvas { image-rendering: pixelated; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  table { border-collapse: collapse; margin: 8px 0; }
+  td, th { border: 1px solid #999; padding: 3px 8px; font-size: 12px; }
+  .print-body canvas { border: 1px solid #555; margin: 4px 10px 4px 0; vertical-align: top; }
+  .notes { font-size: 12px; }
+  @media print { .noprint { display: none; } }
+</style>
+</head>
+<body>
+<p class="loading noprint" id="loading">正在载入项目数据…</p>
+<div id="out"></div>
+<script type="module">
+import { buildPrintSheet } from "/static/js/printsheet.js";
+
+const pid = {{ project_id|tojson }};
+try {
+  const res = await fetch(`/api/projects/${pid}`);
+  if (!res.ok) throw new Error("项目不存在");
+  const proj = await res.json();
+  document.getElementById("loading").remove();
+  buildPrintSheet(document.getElementById("out"), proj.name, proj.data, { standalone: true });
+  setTimeout(() => window.print(), 400);
+} catch (e) {
+  document.getElementById("loading").textContent = "无法载入：" + e.message;
+}
+</script>
+</body>
+</html>

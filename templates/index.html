@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多综织物设计台 · 手工织布工作室</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">🜨 多综织物设计台</div>
+  <div class="top-group">
+    <input id="projectName" class="project-name" type="text" value="未命名织物" title="项目名称">
+    <span id="saveState" class="save-state">未保存</span>
+  </div>
+  <div class="top-group">
+    <button id="btnNew" title="新建草稿">新建</button>
+    <button id="btnOpen" title="打开 / 管理项目">项目</button>
+    <button id="btnSave" class="primary" title="保存到本机数据库 (Ctrl+S)">保存</button>
+    <button id="btnUndo" title="撤销 (Ctrl+Z)">↶ 撤销</button>
+    <button id="btnRedo" title="重做 (Ctrl+Y)">↷ 重做</button>
+  </div>
+  <div class="top-group">
+    <button id="btnExportWif">导出 WIF</button>
+    <button id="btnImportWif">导入 WIF</button>
+    <input id="wifFile" type="file" accept=".wif,.txt" hidden>
+    <button id="btnPrint" class="primary">打印工艺单</button>
+  </div>
+</header>
+
+<main class="workspace">
+
+  <!-- 左侧工具面板 -->
+  <aside class="leftpanel">
+    <section class="panel">
+      <h3>织机参数</h3>
+      <label class="field"><span>经纱根数</span>
+        <input id="inpEnds" type="number" min="2" max="120" value="24"></label>
+      <label class="field"><span>综框数</span>
+        <input id="inpShafts" type="number" min="2" max="32" value="4"></label>
+      <label class="field"><span>踏板数</span>
+        <input id="inpTreadles" type="number" min="2" max="32" value="4"></label>
+      <label class="field"><span>踏序行数</span>
+        <input id="inpPicks" type="number" min="2" max="200" value="24"></label>
+      <label class="field"><span>提综逻辑</span>
+        <select id="selShed">
+          <option value="jack">升综（jack，提起的综在上）</option>
+          <option value="sinking">降综（sinking，压下的综在上）</option>
+        </select>
+      </label>
+      <div class="hint">改尺寸时尽量保留已有格子数据。</div>
+    </section>
+
+    <section class="panel">
+      <h3>画笔工具</h3>
+      <div class="toolgrid" id="toolGrid">
+        <button data-tool="paint" class="tool active">✏️<span>画笔</span></button>
+        <button data-tool="erase" class="tool">🧽<span>橡皮</span></button>
+        <button data-tool="select" class="tool">⬚<span>框选</span></button>
+      </div>
+      <div class="opgrid">
+        <button id="opCopy">复制</button>
+        <button id="opPaste">粘贴</button>
+        <button id="opMirrorH">水平镜像</button>
+        <button id="opMirrorV">垂直镜像</button>
+        <button id="opCycleFill">循环填充</button>
+        <button id="opClearSel">清除选区</button>
+      </div>
+      <div class="field inline">
+        <span>格大小</span>
+        <input id="zoom" type="range" min="8" max="28" value="16">
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>浮长阈值</h3>
+      <label class="field"><span>经浮长 ≥</span>
+        <input id="inpWarpFloat" type="number" min="1" max="99" value="4"></label>
+      <label class="field"><span>纬浮长 ≥</span>
+        <input id="inpWeftFloat" type="number" min="1" max="99" value="4"></label>
+      <div class="hint">组织图中以描边标出超限浮长；点击问题可定位。</div>
+    </section>
+  </aside>
+
+  <!-- 中央草图区 -->
+  <section class="center">
+    <div class="center-scroll" id="centerScroll">
+      <div class="draft-wrap">
+        <!-- 行1：空白角格 + 穿综 -->
+        <div class="grid-corner"></div>
+        <div class="grid-col">
+          <div class="grid-title">穿综 THREADING（列＝经纱，红框为第 1 根）</div>
+          <canvas id="cvThreading"></canvas>
+        </div>
+        <!-- 行2：栓结 | 踏序+组织图 -->
+        <div class="grid-row">
+          <div class="grid-title v">栓结 TIE-UP（行＝综框，列＝踏板）</div>
+          <canvas id="cvTieup"></canvas>
+        </div>
+        <div class="grid-col">
+          <div class="grid-title">踏序 TREADLING ＋ 组织图 DRAWDOWN（红框为第 1 纬）</div>
+          <div class="draft-bottom">
+            <canvas id="cvTreadling"></canvas>
+            <canvas id="cvDrawdown"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="lift-wrap">
+        <div class="lift-head">
+          <span>逐纬提综状态 LIFT PLAN（行＝纬，列＝综框；深色＝提起/在上）</span>
+          <button id="btnSample" class="mini">载入 4 综 2/2 斜纹示例</button>
+        </div>
+        <canvas id="cvLift"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右侧面板 -->
+  <aside class="rightpanel">
+    <nav class="tabs">
+      <button data-tab="issues" class="tab active">检查</button>
+      <button data-tab="colors" class="tab">色序</button>
+      <button data-tab="preview" class="tab">布面</button>
+      <button data-tab="yarn" class="tab">用纱</button>
+      <button data-tab="projects" class="tab">版本</button>
+    </nav>
+
+    <div class="tabpage active" data-tab="issues">
+      <div class="issue-summary" id="issueSummary">正在检查…</div>
+      <ul class="issuelist" id="issueList"></ul>
+    </div>
+
+    <div class="tabpage" data-tab="colors">
+      <div class="color-block">
+        <h4>调色板</h4>
+        <div class="palette" id="palette"></div>
+        <div class="palette-edit">
+          <input type="color" id="paletteColor" value="#b54848">
+          <button id="paletteAdd" class="mini">加入颜色</button>
+          <button id="paletteDel" class="mini">删除当前色</button>
+        </div>
+        <h4>经纱色序 <span class="dim" id="warpSeqLen"></span></h4>
+        <div class="seqtools">
+          <button class="mini" data-seq="warp" data-act="paint">涂色</button>
+          <button class="mini" data-seq="warp" data-act="cycle">整排循环</button>
+          <button class="mini" data-seq="warp" data-act="repeat">反转序列</button>
+          <button class="mini" data-seq="warp" data-act="clear">填当前色</button>
+        </div>
+        <canvas id="cvWarpColors"></canvas>
+        <h4>纬纱色序 <span class="dim" id="weftSeqLen"></span></h4>
+        <div class="seqtools">
+          <button class="mini" data-seq="weft" data-act="paint">涂色</button>
+          <button class="mini" data-seq="weft" data-act="cycle">整排循环</button>
+          <button class="mini" data-seq="weft" data-act="repeat">反转序列</button>
+          <button class="mini" data-seq="weft" data-act="clear">填当前色</button>
+        </div>
+        <canvas id="cvWeftColors"></canvas>
+        <label class="field"><span>组织图显示</span>
+          <select id="drawdownMode">
+            <option value="color">彩色（经/纬色）</option>
+            <option value="mono">黑白</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="tabpage" data-tab="preview">
+      <div class="preview-controls">
+        <label class="field"><span>经密 根/cm</span>
+          <input id="inpEpc" type="number" min="2" max="120" value="10" step="0.5"></label>
+        <label class="field"><span>纬密 根/cm</span>
+          <input id="inpPpc" type="number" min="2" max="120" value="8" step="0.5"></label>
+        <label class="field"><span>横向重复</span>
+          <input id="inpRepX" type="number" min="1" max="50" value="2"></label>
+        <label class="field"><span>纵向重复</span>
+          <input id="inpRepY" type="number" min="1" max="50" value="2"></label>
+        <div class="dim" id="previewSize"></div>
+      </div>
+      <div class="preview-scroll"><canvas id="cvPreview"></canvas></div>
+    </div>
+
+    <div class="tabpage" data-tab="yarn">
+      <h4>织物与用纱估算</h4>
+      <label class="field"><span>筘幅/成品幅宽 cm</span>
+        <input id="inpWidth" type="number" min="1" max="400" value="20" step="0.5"></label>
+      <label class="field"><span>成品长度 cm</span>
+        <input id="inpLength" type="number" min="1" max="2000" value="30" step="1"></label>
+      <label class="field"><span>经缩率 %</span>
+        <input id="inpWarpTakeup" type="number" min="0" max="60" value="8" step="0.5"></label>
+      <label class="field"><span>纬缩率 %</span>
+        <input id="inpWeftTakeup" type="number" min="0" max="60" value="6" step="0.5"></label>
+      <label class="field"><span>上机回丝（经）cm</span>
+        <input id="inpWasteWarp" type="number" min="0" max="200" value="60" step="5"></label>
+      <label class="field"><span>边纱回丝率（纬）%</span>
+        <input id="inpWasteWeft" type="number" min="0" max="40" value="5" step="1"></label>
+      <label class="field"><span>经纱线密度 tex</span>
+        <input id="inpWarpTex" type="number" min="1" max="2000" value="30" step="1"></label>
+      <label class="field"><span>纬纱线密度 tex</span>
+        <input id="inpWeftTex" type="number" min="1" max="2000" value="30" step="1"></label>
+      <div class="yarn-results" id="yarnResults"></div>
+    </div>
+
+    <div class="tabpage" data-tab="projects">
+      <h4>版本快照</h4>
+      <div class="row">
+        <input id="versionLabel" type="text" placeholder="版本说明，如：改斜纹方向">
+        <button id="btnSaveVersion" class="mini">存版本</button>
+      </div>
+      <ul class="versionlist" id="versionList"></ul>
+      <h4>本机项目</h4>
+      <ul class="projectlist" id="projectList"></ul>
+      <h4>版本比较</h4>
+      <div class="row">
+        <select id="cmpA"></select>
+        <select id="cmpB"></select>
+      </div>
+      <button id="btnCompare" class="mini">并排比较差异</button>
+    </div>
+  </aside>
+</main>
+
+<footer class="statusbar">
+  <span id="statusMain">就绪</span>
+  <span id="statusHint" class="dim">画笔：拖动绘制 · 框选后可复制/镜像/循环填充 · 单击问题可定位</span>
+</footer>
+
+<!-- 隐藏的工艺单打印区（屏幕上不显示，打印时只输出此区域） -->
+<div id="printArea">
+  <div id="printCanvases" class="print-body"></div>
+  <div class="print-notes">
+    <h3>检查提示</h3>
+    <p id="printNotes"></p>
+  </div>
+</div>
+
+<!-- 版本比较窗口 -->
+<div id="cmpModal" class="modal hidden">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <span>版本并排比较</span>
+      <button id="cmpClose" class="mini">关闭</button>
+    </div>
+    <div id="cmpSummary" class="cmp-summary"></div>
+    <div class="cmp-body">
+      <div><h4 id="cmpTitleA">A</h4><canvas id="cvCmpA"></canvas></div>
+      <div><h4 id="cmpTitleB">B</h4><canvas id="cvCmpB"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- 项目打开窗口 -->
+<div id="openModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><span>打开本机项目</span><button id="openClose" class="mini">关闭</button></div>
+    <ul class="projectlist big" id="openProjectList"></ul>
+  </div>
+</div>
+
+<script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

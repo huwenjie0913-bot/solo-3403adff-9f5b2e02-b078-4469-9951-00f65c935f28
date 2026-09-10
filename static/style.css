@@ -1,0 +1,329 @@
+/* ============================================================
+   多综织物设计台 样式
+   ============================================================ */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 13px/1.5 "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #26303a;
+  background: #eef1f4;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+button {
+  font: inherit;
+  border: 1px solid #c3ccd4;
+  background: #fff;
+  border-radius: 5px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: #33404c;
+}
+button:hover { background: #f0f5fa; border-color: #8fa9c0; }
+button.primary { background: #3d7ab8; color: #fff; border-color: #3d7ab8; }
+button.primary:hover { background: #34689d; }
+button.mini { padding: 2px 8px; font-size: 12px; }
+button:disabled { opacity: .4; cursor: default; }
+input[type="number"], input[type="text"], select {
+  width: 100%;
+  border: 1px solid #c3ccd4;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font: inherit;
+  background: #fff;
+}
+input[type="color"] { width: 34px; height: 24px; padding: 0; border: 1px solid #c3ccd4; }
+.dim { color: #8a96a2; font-size: 11px; }
+.hidden { display: none !important; }
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 6px 14px;
+  background: #2f3b47;
+  color: #eef3f7;
+  flex: 0 0 auto;
+}
+.brand { font-weight: 700; font-size: 15px; white-space: nowrap; }
+.top-group { display: flex; align-items: center; gap: 6px; }
+.project-name {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.25);
+  color: #fff;
+  border-radius: 4px;
+  padding: 3px 8px;
+  width: 150px;
+}
+.save-state { font-size: 11px; color: #a9c4dc; white-space: nowrap; }
+.save-state.dirty { color: #f3c26b; }
+.topbar button {
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.22);
+  color: #e6edf3;
+  padding: 4px 9px;
+}
+.topbar button:hover { background: rgba(255,255,255,.2); }
+.topbar button.primary { background: #4d87c2; border-color: #4d87c2; }
+
+/* ---------- 主布局 ---------- */
+.workspace {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 230px 1fr 320px;
+  min-height: 0;
+}
+.leftpanel, .rightpanel {
+  background: #f7f9fb;
+  border-right: 1px solid #d7dde3;
+  overflow-y: auto;
+  padding: 8px;
+}
+.rightpanel {
+  border-right: none;
+  border-left: 1px solid #d7dde3;
+  display: flex;
+  flex-direction: column;
+}
+.center { overflow: hidden; min-width: 0; background: #e7ebef; }
+.center-scroll {
+  height: 100%;
+  overflow: auto;
+  padding: 14px;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #dce2e8;
+  border-radius: 7px;
+  padding: 9px 10px;
+  margin-bottom: 9px;
+}
+.panel h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #5a6b7a;
+  border-bottom: 1px solid #edf0f3;
+  padding-bottom: 5px;
+}
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #46535f;
+}
+.field > span { white-space: nowrap; }
+.field input[type="number"], .field select { width: 104px; }
+.field.inline input[type="range"] { flex: 1; }
+.hint { font-size: 11px; color: #93a0ac; margin-top: 4px; }
+
+/* 工具 */
+.toolgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  font-size: 11px;
+  background: #fbfcfd;
+}
+.tool span { font-size: 11px; }
+.tool.active { background: #e3eefb; border-color: #4d87c2; box-shadow: inset 0 0 0 1px #4d87c2; }
+.opgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px; }
+.opgrid button { font-size: 12px; padding: 4px 4px; }
+
+/* ---------- 草图区 ---------- */
+.draft-wrap {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  gap: 6px;
+  width: max-content;
+  min-width: 100%;
+}
+.grid-corner { width: 150px; }
+.grid-col { display: flex; flex-direction: column; min-width: 0; }
+.grid-row { display: flex; flex-direction: row; align-items: flex-start; }
+.grid-title {
+  font-size: 11px;
+  color: #70808e;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+.grid-title.v { writing-mode: vertical-rl; transform: rotate(180deg); height: auto; align-self: stretch; padding: 4px 2px; }
+.draft-bottom { display: flex; gap: 8px; align-items: flex-start; }
+canvas { display: block; }
+#cvThreading, #cvTreadling, #cvDrawdown, #cvTieup, #cvLift {
+  border: 1px solid #aeb9c4;
+  background: #fff;
+  cursor: crosshair;
+}
+.lift-wrap { margin-top: 14px; width: max-content; max-width: 100%; }
+.lift-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: #70808e;
+  margin-bottom: 3px;
+}
+
+/* ---------- 右侧标签页 ---------- */
+.tabs { display: flex; flex: 0 0 auto; border-bottom: 1px solid #d7dde3; background: #f7f9fb; }
+.tab {
+  flex: 1;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  border-radius: 0;
+  padding: 9px 2px;
+  color: #6a7784;
+}
+.tab.active { color: #2f6ea8; border-bottom-color: #3d7ab8; font-weight: 600; background: #fff; }
+.tabpage { display: none; flex: 1 1 auto; overflow-y: auto; padding: 10px; background: #fff; }
+.tabpage.active { display: block; }
+.tabpage h4 { margin: 12px 0 6px; font-size: 12px; color: #566575; }
+.tabpage h4:first-child { margin-top: 2px; }
+
+/* 检查 */
+.issue-summary { font-size: 12px; padding: 7px 9px; border-radius: 6px; margin-bottom: 8px; }
+.issue-summary.ok { background: #e7f5ea; color: #2e7d43; border: 1px solid #bfe3c8; }
+.issue-summary.warn { background: #fdf3e0; color: #92600a; border: 1px solid #f0d8a8; }
+.issuelist, .versionlist, .projectlist { list-style: none; margin: 0; padding: 0; }
+.issuelist li {
+  border: 1px solid #e3e8ed;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+}
+.issuelist li:hover { background: #f2f7fc; border-color: #9fc0e0; }
+.issuelist li .ico { flex: 0 0 auto; }
+.issuelist li.error { border-left: 3px solid #d65a5a; }
+.issuelist li.warn  { border-left: 3px solid #e0a23d; }
+.issuelist li.info  { border-left: 3px solid #5a93d6; }
+.issuelist li .where { color: #8a96a2; font-size: 11px; white-space: nowrap; }
+
+/* 颜色 */
+.palette { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.swatch {
+  width: 24px; height: 24px;
+  border-radius: 4px;
+  border: 2px solid #fff;
+  outline: 1px solid #c8d0d8;
+  cursor: pointer;
+  position: relative;
+}
+.swatch.active { outline: 2px solid #3d7ab8; outline-offset: 1px; }
+.palette-edit { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+.seqtools { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
+#cvWarpColors, #cvWeftColors { border: 1px solid #c8d0d8; background: #fff; cursor: pointer; margin-bottom: 4px; }
+
+/* 预览 */
+.preview-controls { border-bottom: 1px solid #edf0f3; margin-bottom: 8px; }
+.preview-controls .field input { width: 90px; }
+.preview-scroll { overflow: auto; max-height: 52vh; border: 1px solid #d7dde3; border-radius: 6px; background: #f0f2f5; padding: 6px; }
+#cvPreview { background: #fff; }
+
+/* 用纱 */
+.yarn-results { margin-top: 10px; }
+.yarn-results table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.yarn-results td, .yarn-results th { border: 1px solid #dde3e9; padding: 4px 6px; text-align: right; }
+.yarn-results td:first-child, .yarn-results th:first-child { text-align: left; }
+.yarn-results tr.sub td { background: #f5f8fb; font-weight: 600; }
+.yarn-bycolor td:first-child { padding-left: 16px; color: #5a6b7a; }
+
+/* 版本/项目 */
+.row { display: flex; gap: 6px; margin-bottom: 8px; }
+.versionlist li, .projectlist li {
+  border: 1px solid #e3e8ed;
+  border-radius: 6px;
+  padding: 7px 8px;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+.projectlist li { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.projectlist .meta { color: #8a96a2; font-size: 11px; }
+.v-label { font-weight: 600; margin-bottom: 2px; }
+.v-actions { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+.projectlist.big li { display: block; cursor: pointer; }
+.projectlist.big li:hover { background: #f2f7fc; }
+
+/* ---------- 状态栏 ---------- */
+.statusbar {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 4px 12px;
+  background: #2f3b47;
+  color: #cfd9e2;
+  font-size: 11px;
+}
+.statusbar .dim { color: #8fa0af; }
+
+/* ---------- 弹窗 ---------- */
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(25,33,42,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.modal-box {
+  background: #fff;
+  border-radius: 9px;
+  width: 460px; max-width: 92vw;
+  max-height: 84vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 14px 50px rgba(0,0,0,.3);
+}
+.modal-box.wide { width: 980px; }
+.modal-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px;
+  font-weight: 600;
+  border-bottom: 1px solid #e3e8ed;
+}
+.cmp-summary { padding: 8px 14px; font-size: 12px; color: #566575; border-bottom: 1px solid #edf0f3; }
+.cmp-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; overflow: auto; }
+.cmp-body h4 { margin: 0 0 6px; font-size: 12px; }
+.cmp-body canvas { border: 1px solid #b9c3cd; background: #fff; }
+
+/* ---------- 打印区（屏幕隐藏） ---------- */
+#printArea { display: none; }
+@media print {
+  body * { visibility: hidden !important; }
+  #printArea, #printArea * { visibility: visible !important; }
+  #printArea {
+    display: block;
+    position: absolute; inset: 0;
+    background: #fff;
+    padding: 8mm;
+    color: #222;
+    font-size: 11px;
+    overflow: visible;
+  }
+  #printArea h1 { font-size: 18px; margin: 0 0 8px; }
+  #printArea h3 { font-size: 12px; margin: 10px 0 4px; }
+  #printArea table { border-collapse: collapse; margin: 4px 0 8px; }
+  #printArea th, #printArea td { border: 1px solid #999; padding: 2px 7px; text-align: left; }
+  #printArea th { background: #f0f0f0; }
+  #printArea canvas { border: 1px solid #666; margin: 3px 8px 6px 0; vertical-align: top; }
+  #printArea p { white-space: pre-line; margin: 2px 0; }
+  .print-body { page-break-inside: auto; }
+  .print-body canvas { page-break-inside: avoid; }
+  @page { size: A4 landscape; margin: 10mm; }
+}
