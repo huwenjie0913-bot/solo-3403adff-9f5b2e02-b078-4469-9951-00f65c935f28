@@ -23,6 +23,7 @@ export const api = {
 
   listVersions: (pid) => jget(`/api/projects/${pid}/versions`),
   saveVersion: (pid, label) => jsend(`/api/projects/${pid}/versions`, "POST", { label }),
+  saveVersionData: (pid, label, data) => jsend(`/api/projects/${pid}/versions`, "POST", { label, data }),
   getVersion: (vid) => jget(`/api/versions/${vid}`),
   deleteVersion: (vid) => jsend(`/api/versions/${vid}`, "DELETE", {}),
 };

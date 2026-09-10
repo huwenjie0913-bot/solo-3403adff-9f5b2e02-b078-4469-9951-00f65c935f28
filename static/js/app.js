@@ -14,6 +14,7 @@ import {
 } from "./warp.js";
 import { WarpView } from "./warpview.js";
 import { printWarpSheet } from "./warpsheet.js";
+import { TreadleStudio } from "./treadleview.js";
 
 // --------------------------------------------------------------------------- //
 // 状态
@@ -883,6 +884,55 @@ function doImportWif(file) {
 }
 
 // --------------------------------------------------------------------------- //
+// 提综 → 踏板方案转换台
+// --------------------------------------------------------------------------- //
+let treadleStudio = null;
+
+function openTreadleStudio() {
+  if (!treadleStudio) {
+    treadleStudio = new TreadleStudio({
+      getDraft: () => draft,
+      getAnalysis: () => analysis || analyze(draft),
+      onApply: applyTreadleCandidate,
+      onLocate: (p) => { gTread.locate(p, 0); gLift.locate(p, 0); },
+    });
+  }
+  treadleStudio.open();
+}
+
+/**
+ * 应用候选：原草稿保留为“转换前”版本快照，新方案成为当前草稿并另存新版本。
+ * 返回新版本说明文本。
+ */
+async function applyTreadleCandidate(cand, params) {
+  draft.name = $("#projectName").value.trim() || "未命名织物";
+  const stamp = new Date().toLocaleString();
+  if (currentProjectId) {
+    await api.updateProject(currentProjectId, draft.name, draft);
+    await api.saveVersion(currentProjectId, `转换前快照（${stamp}）`);
+  } else {
+    const p = await api.createProject(draft.name, draft);
+    currentProjectId = p.id;
+    await api.saveVersion(currentProjectId, `转换前快照（${stamp}）`);
+  }
+  // 替换栓结与踏序（踏板数变化时经 resize 保留有效区域）
+  applyDimensions(draft, { treadles: params.treadles });
+  draft.tieup = deepClone(cand.tieup);
+  draft.treadling = deepClone(cand.treadling);
+  const label = `踏板方案 #${params.index + 1}（${params.treadles} 踏，上限 ${params.maxPress}，${stamp}）`;
+  await api.updateProject(currentProjectId, draft.name, draft);
+  await api.saveVersion(currentProjectId, label);
+  markSaved(currentProjectId);
+  undoStack.length = 0; redoStack.length = 0;
+  rebuildFromDraft();
+  refreshVersions();
+  refreshProjectLists();
+  treadleStudio && treadleStudio.close();
+  setStatus(`已应用${label}；原草稿保存在“转换前快照”版本中`);
+  return label;
+}
+
+// --------------------------------------------------------------------------- //
 // 新建
 // --------------------------------------------------------------------------- //
 function newDraft() {
@@ -1122,6 +1172,8 @@ function bind() {
   $("#wifFile").onchange = (e) => { if (e.target.files[0]) doImportWif(e.target.files[0]); e.target.value = ""; };
   $("#btnPrint").onclick = () => printDraft(draft.name, draft);
   $("#btnSample").onclick = loadSample;
+  $("#btnOpenTreadle").onclick = openTreadleStudio;
+  $("#btnLiftToTreadle").onclick = openTreadleStudio;
 
   // 版本
   $("#btnSaveVersion").onclick = saveVersion;
@@ -1134,6 +1186,10 @@ function bind() {
     if (!$("#warpModal").classList.contains("hidden")) {
       if (handleWarpKey(e)) e.preventDefault();
       return;
+    }
+    if (!$("#treadleModal").classList.contains("hidden")) {
+      if (e.key === "Escape") treadleStudio && treadleStudio.close();
+      if (!(e.ctrlKey || e.metaKey)) return;   // 弹窗内不响应画笔快捷键
     }
     if (!(e.ctrlKey || e.metaKey)) {
       const tag = (e.target.tagName || "").toLowerCase();
@@ -1209,6 +1265,8 @@ window.__app = {
   set currentProjectId(v) { currentProjectId = v; },
   get grids() { return { threading: gThread, tieup: gTie, treadling: gTread, drawdown: gDraw, lift: gLift }; },
   get strips() { return { warp: cWarp, weft: cWeft }; },
+  get treadleStudio() { return treadleStudio; },
+  openTreadleStudio,
   snapshot, undo, redo, recompute, rebuildFromDraft,
   setActiveColor: (i) => { activeColor = i; },
 };

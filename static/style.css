@@ -293,6 +293,54 @@ canvas { display: block; }
 .modal-box.wide { width: 980px; }
 .modal-box.xwide { width: 1180px; max-width: 96vw; }
 
+/* ---------- 提综→踏板转换台 ---------- */
+.modal-box.td-box { width: 1160px; max-width: 97vw; }
+.td-body {
+  display: grid;
+  grid-template-columns: minmax(380px, 460px) 1fr;
+  gap: 12px;
+  padding: 10px 14px;
+  overflow: auto;
+  flex: 1 1 auto;
+}
+.td-left { border-right: 1px solid #e3e8ed; padding-right: 12px; min-width: 0; }
+.td-right { display: flex; flex-direction: column; min-width: 0; }
+.td-form { display: flex; gap: 14px; margin: 8px 0; }
+.td-rulerow { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.td-constr-wrap { background: #fafbfc; border: 1px solid #e3e8ed; border-radius: 6px; padding: 6px; overflow: auto; }
+.td-constr-title { font-size: 11px; color: #566575; margin-bottom: 4px; }
+#cvTreadleConstraints { display: block; cursor: pointer; }
+.td-result { margin-top: 10px; }
+.td-info { font-size: 12px; color: #566575; background: #f2f7fc; border: 1px solid #d6e4f2; border-radius: 6px; padding: 7px 9px; }
+.td-warn { font-size: 11px; color: #92600a; background: #fdf3e0; border: 1px solid #f0d8a8; border-radius: 5px; padding: 5px 8px; margin-top: 5px; }
+.td-ok-head { font-size: 12px; color: #2e7d43; background: #e7f5ea; border: 1px solid #bfe3c8; border-radius: 6px; padding: 7px 9px; }
+.td-warn-head { font-size: 11px; font-weight: 600; color: #92600a; margin: 6px 0 2px; }
+.td-conflict-head { font-size: 12px; color: #b3261e; background: #fbe9e7; border: 1px solid #f1c4c0; border-radius: 6px; padding: 7px 9px; margin-bottom: 6px; }
+.td-conflict { font-size: 11px; color: #8c2f28; background: #fff7f6; border: 1px solid #f1d6d3; border-radius: 5px; padding: 5px 8px; margin-top: 5px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.td-conflict .mini { flex: 0 0 auto; }
+.td-cards { display: flex; gap: 8px; overflow-x: auto; padding: 8px 2px; }
+.td-card {
+  flex: 0 0 auto;
+  border: 2px solid #d7dde3;
+  border-radius: 6px;
+  padding: 4px;
+  cursor: pointer;
+  background: #fff;
+}
+.td-card:hover { border-color: #8fb3d6; background: #f2f7fc; }
+.td-card.sel { border-color: #3d7ab8; background: #eaf2fa; }
+.td-card canvas { display: block; }
+.td-card-cap { font-size: 10px; color: #566575; margin-top: 2px; line-height: 1.35; }
+.td-preview { flex: 1 1 auto; overflow: auto; min-height: 200px; }
+.td-preview-info { font-size: 12px; color: #33404c; background: #f7f9fb; border: 1px solid #e3e8ed; border-radius: 6px; padding: 7px 9px; margin-bottom: 8px; }
+.td-preview-info .ok { color: #2e7d43; }
+.td-preview-info .bad { color: #b3261e; }
+.td-preview-grids { display: flex; flex-wrap: wrap; gap: 14px; }
+.td-pgrid-title { font-size: 11px; color: #566575; margin-bottom: 3px; }
+.td-pgrid canvas { border: 1px solid #b9c3cd; background: #fff; display: block; }
+.td-pgrid.cmp canvas { max-width: 100%; }
+.td-apply-row { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding-top: 8px; border-top: 1px solid #e3e8ed; margin-top: 8px; }
+
 /* ---------- 整经与穿筘 ---------- */
 .bout-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
 .bout-table th, .bout-table td { border: 1px solid #e3e8ed; padding: 3px 5px; text-align: left; }

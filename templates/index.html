@@ -110,7 +110,10 @@
       <div class="lift-wrap">
         <div class="lift-head">
           <span>逐纬提综状态 LIFT PLAN（行＝纬，列＝综框；深色＝提起/在上）</span>
-          <button id="btnSample" class="mini">载入 4 综 2/2 斜纹示例</button>
+          <span>
+            <button id="btnLiftToTreadle" class="mini" title="以此提综状态为目标搜索踏板方案">提综→踏板转换</button>
+            <button id="btnSample" class="mini">载入 4 综 2/2 斜纹示例</button>
+          </span>
         </div>
         <canvas id="cvLift"></canvas>
       </div>
@@ -121,6 +124,7 @@
   <aside class="rightpanel">
     <nav class="tabs">
       <button data-tab="issues" class="tab active">检查</button>
+      <button data-tab="treadle" class="tab">踏综</button>
       <button data-tab="colors" class="tab">色序</button>
       <button data-tab="preview" class="tab">布面</button>
       <button data-tab="yarn" class="tab">用纱</button>
@@ -131,6 +135,21 @@
     <div class="tabpage active" data-tab="issues">
       <div class="issue-summary" id="issueSummary">正在检查…</div>
       <ul class="issuelist" id="issueList"></ul>
+    </div>
+
+    <div class="tabpage" data-tab="treadle">
+      <h4>提综 → 踏板方案转换与优化</h4>
+      <p class="dim" id="tdTabInfo">
+        读取当前草稿（或 WIF 导入）的逐纬提综状态，在指定踏板数、每纬踩踏上限与
+        保留/禁止栓结约束下，搜索能逐纬精确复现提综组合的栓结与踏序候选；
+        可锁定部分踏板重新求解。升综/降综分别沿用现有推演逻辑。
+      </p>
+      <div class="row">
+        <button id="btnOpenTreadle" class="mini primary">打开踏板方案转换台</button>
+      </div>
+      <div class="hint">候选按「踏板数 → 多踏板纬数 → 总踩踏次数 → 栓结改动量」排序；
+        应用时自动保存“转换前”与“转换后”两个版本快照，原草稿保留；
+        WIF 导出、版本比较与打印工艺单均使用选定后的方案。</div>
     </div>
 
     <div class="tabpage" data-tab="colors">
@@ -327,6 +346,46 @@
       <span id="warpCursorInfo">—</span>
       <span id="warpProgText" class="dim"></span>
       <span class="dim">键盘：←→ 移动 · ↑↓ 换阶段 · 1/2/3 勾选 · 空格 完成并前进 · Backspace 回退 · 双击定位草图</span>
+    </div>
+  </div>
+</div>
+
+<!-- 提综→踏板转换台 -->
+<div id="treadleModal" class="modal hidden">
+  <div class="modal-box td-box">
+    <div class="modal-head">
+      <span>提综方案 → 栓结/踏板方案 转换与优化</span>
+      <button id="tdClose" class="mini">关闭</button>
+    </div>
+    <div class="td-body">
+      <div class="td-left">
+        <div class="dim" id="tdSource"></div>
+        <div class="td-form">
+          <label class="field"><span>踏板数</span>
+            <input id="tdTreadles" type="number" min="2" max="32" value="4"></label>
+          <label class="field"><span>每纬同时踩踏上限</span>
+            <input id="tdMaxPress" type="number" min="1" max="32" value="2"></label>
+        </div>
+        <div class="td-rulerow">
+          <button id="tdRun" class="mini primary">搜索候选</button>
+          <button id="tdImportKeep" class="mini">现有栓结标为保留</button>
+          <button id="tdClearRules" class="mini">清空标记</button>
+          <button id="tdLockAll" class="mini">全锁/全解锁</button>
+        </div>
+        <div class="td-constr-wrap">
+          <div class="td-constr-title">栓结约束：点格循环切换　保留(绿)→禁止(红叉)→无；
+            点列首 🔓 可锁定整列（按当前栓结固定）后重新求解。灰列为锁定列。</div>
+          <canvas id="cvTreadleConstraints"></canvas>
+        </div>
+        <div id="tdResult" class="td-result"></div>
+      </div>
+      <div class="td-right">
+        <div id="tdPreview" class="td-preview"></div>
+        <div class="td-apply-row">
+          <button id="tdApply" class="primary" disabled>应用所选候选到新版本快照</button>
+          <span class="dim">原草稿保留为“转换前”快照；WIF 导出、版本比较、打印工艺单随之使用新方案。</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
