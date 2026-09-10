@@ -75,6 +75,11 @@ def row_to_project(r):
     }
 
 
+# 模块导入即保证数据库与表存在（flask run 等方式启动时同样有效）
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+init_db()
+
+
 # --------------------------------------------------------------------------- #
 # 页面
 # --------------------------------------------------------------------------- #
@@ -221,5 +226,7 @@ def wif_validate():
 
 
 if __name__ == "__main__":
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     init_db()
+    print("多综织物设计台已启动：http://127.0.0.1:5000  （Ctrl+C 停止）")
     app.run(host="127.0.0.1", port=5000, debug=False)

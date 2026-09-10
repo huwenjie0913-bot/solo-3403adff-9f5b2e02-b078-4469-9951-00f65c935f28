@@ -92,16 +92,21 @@ export class DraftGrid {
       if (!p) return;
       e.preventDefault();
       window._gridFocus = this;
-      this.onBeginEdit();
       if (this.tool === "select") {
         this.drag = { mode: "select", startR: p.r, startC: p.c };
         this.sel = { r1: p.r, c1: p.c, r2: p.r, c2: p.c };
       } else if (this.tool === "paint") {
         const val = this.singlePerColumn ? 1 : (this.data[p.r][p.c] ? 0 : 1);
+        // 只有第一格确实会改值时，才在改动前建立撤销快照
+        const willChange = this.singlePerColumn
+          ? this.data.some((row, s) => row[p.c] !== (s === p.r ? val : 0))
+          : !!this.data[p.r][p.c] !== !!val;
+        if (willChange && !this.drag) this.onBeginEdit();
         this.drag = { mode: "paint", val };
         this._paintCell(p.r, p.c, val);
         this.once = [p];
       } else {
+        if (this.data[p.r][p.c] !== 0 && !this.drag) this.onBeginEdit();
         this.drag = { mode: "erase" };
         this._paintCell(p.r, p.c, 0);
         this.once = [p];
@@ -501,28 +506,37 @@ export class ColorStrip {
       const c = this.cellAt(e);
       if (c == null) return;
       e.preventDefault();
-      this.onBeginEdit();
-      const changed = [];
-      const apply = (idx) => {
-        let val;
-        if (this.tool === "cycle") val = (this.activeColor ?? 0);
-        else if (this.tool === "reverse") val = (this.values[idx] + 1) % this.palette.length;
-        else val = this.activeColor ?? 0;
-        if (this.values[idx] !== val) { this.values[idx] = val; changed.push(idx); }
-      };
+      const active = this.activeColor ?? 0;
       if (this.tool === "cycle") {
         // 从点击处开始，用整个调色板循环铺满
+        let any = false;
         for (let i = c; i < this.values.length; i++) {
-          const val = ((i - c) + (this.activeColor ?? 0)) % this.palette.length;
-          if (this.values[i] !== val) { this.values[i] = val; changed.push(i); }
+          if (this.values[i] !== ((i - c) + active) % this.palette.length) { any = true; break; }
         }
+        if (!any) return;
+        this.onBeginEdit();
+        for (let i = c; i < this.values.length; i++)
+          this.values[i] = ((i - c) + active) % this.palette.length;
+        this.onChange();
+        this.draw();
       } else if (this.tool === "reverse") {
         // 反转整个色序（镜像）
+        this.onBeginEdit();
         this.values.reverse();
         this.onChange();
+        this.draw();
       } else {
-        this.drag = true;
+        // paint：在第一次真正改值前建立撤销快照
+        let began = false;
+        const apply = (idx) => {
+          const val = active;
+          if (this.values[idx] !== val) {
+            if (!began) { this.onBeginEdit(); began = true; }
+            this.values[idx] = val;
+          }
+        };
         apply(c);
+        this.drag = true;
         const move = (ev) => {
           const cc = this.cellAt(ev);
           if (cc != null) apply(cc);
@@ -532,12 +546,12 @@ export class ColorStrip {
           window.removeEventListener("mousemove", move);
           window.removeEventListener("mouseup", up);
           this.drag = null;
-          this.onChange();
+          if (began) this.onChange();
         };
         window.addEventListener("mousemove", move);
         window.addEventListener("mouseup", up);
+        this.draw();
       }
-      this.draw();
     };
     this.cv.addEventListener("mousedown", down);
   }

@@ -94,13 +94,13 @@ function buildGrids() {
     canvas: $("#cvWarpColors"),
     palette: draft.palette, values: draft.warpColors,
     onChange: () => recompute(),
-    onEdit: () => snapshot("经纱色序"),
+    onBeginEdit: () => snapshot("经纱色序"),
   });
   cWeft = new ColorStrip({
     canvas: $("#cvWeftColors"),
     palette: draft.palette, values: draft.weftColors,
     onChange: () => recompute(),
-    onEdit: () => snapshot("纬纱色序"),
+    onBeginEdit: () => snapshot("纬纱色序"),
   });
   setTool(currentTool);
 }
@@ -278,7 +278,14 @@ function renderPalette() {
     sw.className = "swatch" + (i === activeColor ? " active" : "");
     sw.style.background = col;
     sw.title = `色 ${i + 1} ${col}（点击选用）`;
-    sw.addEventListener("click", () => { activeColor = i; renderPalette(); });
+    sw.addEventListener("click", () => {
+      activeColor = i;
+      renderPalette();
+      // 让两条色条的画笔立刻使用新选中的颜色
+      cWarp.activeColor = i;
+      cWeft.activeColor = i;
+      $("#paletteColor").value = col;
+    });
     box.appendChild(sw);
   });
 }
@@ -499,14 +506,24 @@ async function refreshVersions() {
 }
 
 async function saveVersion() {
-  if (!currentProjectId) {
-    await saveProject();
-    if (!currentProjectId) return;
+  draft.name = $("#projectName").value.trim() || "未命名织物";
+  try {
+    // 先把屏幕上当前（可能未保存）的草稿提交，再据此创建版本快照
+    if (currentProjectId) {
+      await api.updateProject(currentProjectId, draft.name, draft);
+    } else {
+      const p = await api.createProject(draft.name, draft);
+      currentProjectId = p.id;
+    }
+    markSaved(currentProjectId);
+    await api.saveVersion(currentProjectId, $("#versionLabel").value);
+    $("#versionLabel").value = "";
+    setStatus("已提交当前草稿并保存版本快照");
+    refreshVersions();
+    refreshProjectLists();
+  } catch (e) {
+    setStatus("保存版本失败：" + e.message);
   }
-  await api.saveVersion(currentProjectId, $("#versionLabel").value);
-  $("#versionLabel").value = "";
-  setStatus("版本快照已保存");
-  refreshVersions();
 }
 
 async function compareVersions() {
@@ -609,33 +626,53 @@ function bind() {
     [gThread, gTie, gTread, gDraw, gLift].forEach((g) => g.setCellSize(v));
   };
 
-  // 参数
-  const dimDebounced = debounce(() => { snapshot("调整尺寸"); changeDimensions(); }, 350);
-  ["#inpEnds", "#inpShafts", "#inpTreadles", "#inpPicks"].forEach((sel) => {
-    $(sel).addEventListener("change", dimDebounced);
-  });
-  $("#selShed").onchange = (e) => {
-    snapshot("切换升降综");
-    draft.shed = e.target.value;
-    recompute();
+  // ---- 参数变更：在修改前建立撤销快照，同一输入框的连续键入合并为一次 ----
+  // 对 number/select 控件：focus 时记下当前草稿，blur 后若期间发生改动则入栈一次
+  const focusSnap = new WeakMap();
+  const beginParamEdit = (el) => focusSnap.set(el, deepClone(draft));
+  const commitParamEdit = (el, label) => {
+    const pre = focusSnap.get(el);
+    focusSnap.delete(el);
+    if (pre && JSON.stringify(pre) !== JSON.stringify(draft)) {
+      undoStack.push({ label, d: pre });
+      if (undoStack.length > HISTORY_MAX) undoStack.shift();
+      redoStack.length = 0;
+      updateHistoryButtons();
+      markDirty();
+    }
   };
-  $("#inpWarpFloat").onchange = (e) => { draft.thresholds.warp = +e.target.value || 4; snapshot("浮长阈值"); recompute(); };
-  $("#inpWeftFloat").onchange = (e) => { draft.thresholds.weft = +e.target.value || 4; snapshot("浮长阈值"); recompute(); };
+  const trackParam = (el, label, after) => {
+    el.addEventListener("focus", () => beginParamEdit(el));
+    el.addEventListener("change", () => { after && after(); commitParamEdit(el, label); });
+  };
+
+  // 织机尺寸：立即重建网格，连续改动只留一条撤销记录
+  ["#inpEnds", "#inpShafts", "#inpTreadles", "#inpPicks"].forEach((sel) => {
+    trackParam($(sel), "调整织机尺寸", () => changeDimensions());
+  });
+  trackParam($("#selShed"), "切换升降综", () => { draft.shed = $("#selShed").value; recompute(); });
+  trackParam($("#inpWarpFloat"), "浮长阈值", () => {
+    draft.thresholds.warp = +$("#inpWarpFloat").value || 4; recompute();
+  });
+  trackParam($("#inpWeftFloat"), "浮长阈值", () => {
+    draft.thresholds.weft = +$("#inpWeftFloat").value || 4; recompute();
+  });
   $("#projectName").oninput = (e) => { draft.name = e.target.value; markDirty(); };
   $("#drawdownMode").onchange = () => gDraw.draw();
 
   // 色序
   $("#paletteAdd").onclick = () => {
+    snapshot("新增调色板颜色");
     draft.palette.push($("#paletteColor").value);
     activeColor = draft.palette.length - 1;
     renderPalette();
     cWarp.setValues(draft.warpColors, draft.palette);
     cWeft.setValues(draft.weftColors, draft.palette);
     recompute();
-    snapshot("调色板");
   };
   $("#paletteDel").onclick = () => {
     if (draft.palette.length <= 2) return;
+    snapshot("删除调色板颜色");
     draft.palette.splice(activeColor, 1);
     draft.warpColors = draft.warpColors.map((c) => Math.min(c, draft.palette.length - 1));
     draft.weftColors = draft.weftColors.map((c) => Math.min(c, draft.palette.length - 1));
@@ -644,7 +681,6 @@ function bind() {
     cWarp.setValues(draft.warpColors, draft.palette);
     cWeft.setValues(draft.weftColors, draft.palette);
     recompute();
-    snapshot("调色板");
   };
   $$(".seqtools button").forEach((btn) => {
     btn.onclick = () => {
@@ -679,26 +715,29 @@ function bind() {
     };
   });
 
-  // 预览/用纱参数
-  const numSetting = (sel, key, cb) => {
-    $(sel).oninput = (e) => {
+  // 预览/用纱参数：输入时实时刷新，撤销快照在 focus 前建立、change 时合并提交
+  const numSetting = (sel, key, cb, label = "调整预览/用纱参数") => {
+    const el = $(sel);
+    el.addEventListener("focus", () => beginParamEdit(el));
+    el.addEventListener("input", (e) => {
       draft.settings[key] = +e.target.value;
       cb && cb();
       markDirty();
-    };
+    });
+    el.addEventListener("change", () => commitParamEdit(el, label));
   };
-  numSetting("#inpEpc", "epc", renderPreviewSafe);
-  numSetting("#inpPpc", "ppc", renderPreviewSafe);
-  numSetting("#inpRepX", "repX", renderPreviewSafe);
-  numSetting("#inpRepY", "repY", renderPreviewSafe);
-  numSetting("#inpWidth", "width", renderYarn);
-  numSetting("#inpLength", "length", renderYarn);
-  numSetting("#inpWarpTakeup", "warpTakeup", renderYarn);
-  numSetting("#inpWeftTakeup", "weftTakeup", renderYarn);
-  numSetting("#inpWasteWarp", "wasteWarp", renderYarn);
-  numSetting("#inpWasteWeft", "wasteWeft", renderYarn);
-  numSetting("#inpWarpTex", "warpTex", renderYarn);
-  numSetting("#inpWeftTex", "weftTex", renderYarn);
+  numSetting("#inpEpc", "epc", renderPreviewSafe, "调整经密");
+  numSetting("#inpPpc", "ppc", renderPreviewSafe, "调整纬密");
+  numSetting("#inpRepX", "repX", renderPreviewSafe, "调整横向重复");
+  numSetting("#inpRepY", "repY", renderPreviewSafe, "调整纵向重复");
+  numSetting("#inpWidth", "width", renderYarn, "调整幅宽");
+  numSetting("#inpLength", "length", renderYarn, "调整长度");
+  numSetting("#inpWarpTakeup", "warpTakeup", renderYarn, "调整经缩率");
+  numSetting("#inpWeftTakeup", "weftTakeup", renderYarn, "调整纬缩率");
+  numSetting("#inpWasteWarp", "wasteWarp", renderYarn, "调整经回丝");
+  numSetting("#inpWasteWeft", "wasteWeft", renderYarn, "调整纬回丝率");
+  numSetting("#inpWarpTex", "warpTex", renderYarn, "调整经纱线密度");
+  numSetting("#inpWeftTex", "weftTex", renderYarn, "调整纬纱线密度");
 
   // 标签页（切换时补渲染）
   $$(".tabs .tab").forEach((t) =>
@@ -732,14 +771,37 @@ function bind() {
 
   // 快捷键
   window.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey)) {
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "select" || tag === "textarea") return;
+      if (e.key === "b") setTool("paint");
+      else if (e.key === "e") setTool("erase");
+      else if (e.key === "s") setTool("select");
+      return;
+    }
     const tag = (e.target.tagName || "").toLowerCase();
-    if (tag === "input" || tag === "select" || tag === "textarea") return;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
-    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); }
-    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveProject(); }
-    else if (e.key === "b") setTool("paint");
-    else if (e.key === "e") setTool("erase");
-    else if (e.key === "s") setTool("select");
+    const key = e.key.toLowerCase();
+    const inField = tag === "input" || tag === "select" || tag === "textarea";
+    // 文本类输入框（项目名、版本说明）内不拦截 Ctrl+Z/Y/S，保留原生编辑
+    const isTextField = inField && (tag === "textarea" ||
+      (tag === "input" && !["number", "color", "checkbox", "radio"].includes(e.target.type)));
+    if (isTextField && key !== "s") return;
+    if (key === "z" || key === "y") {
+      e.preventDefault();
+      // 让正在编辑的数字/选择控件先提交 change（完成撤销快照合并）
+      if (inField && document.activeElement && document.activeElement.blur) {
+        document.activeElement.dispatchEvent(new Event("change", { bubbles: true }));
+        document.activeElement.blur();
+      }
+      key === "z" ? (e.shiftKey ? redo() : undo()) : redo();
+    } else if (key === "s") {
+      e.preventDefault();
+      if (inField && document.activeElement && document.activeElement.blur) {
+        document.activeElement.dispatchEvent(new Event("change", { bubbles: true }));
+        document.activeElement.blur();
+      }
+      saveProject();
+    }
   });
 }
 
@@ -775,4 +837,15 @@ function init() {
   }
 }
 
+// 调试/自动化测试钩子（数据仍只在本机）
+window.__app = {
+  get draft() { return draft; },
+  set draft(v) { draft = v; },
+  get currentProjectId() { return currentProjectId; },
+  set currentProjectId(v) { currentProjectId = v; },
+  get grids() { return { threading: gThread, tieup: gTie, treadling: gTread, drawdown: gDraw, lift: gLift }; },
+  get strips() { return { warp: cWarp, weft: cWeft }; },
+  snapshot, undo, redo, recompute, rebuildFromDraft,
+  setActiveColor: (i) => { activeColor = i; },
+};
 init();
