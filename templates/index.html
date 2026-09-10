@@ -124,6 +124,7 @@
       <button data-tab="colors" class="tab">色序</button>
       <button data-tab="preview" class="tab">布面</button>
       <button data-tab="yarn" class="tab">用纱</button>
+      <button data-tab="warp" class="tab">整经</button>
       <button data-tab="projects" class="tab">版本</button>
     </nav>
 
@@ -202,6 +203,54 @@
       <div class="yarn-results" id="yarnResults"></div>
     </div>
 
+    <div class="tabpage" data-tab="warp">
+      <h4>整经与穿筘规划</h4>
+      <div class="dim" id="warpSource"></div>
+
+      <h4>筘与穿筘</h4>
+      <label class="field"><span>筘密</span>
+        <input id="wpReed" type="number" min="0.5" max="80" step="0.5" value="5"></label>
+      <label class="field"><span>筘密单位</span>
+        <select id="wpReedUnit">
+          <option value="cm">齿 / cm</option>
+          <option value="in">齿 / 英寸</option>
+        </select></label>
+      <label class="field"><span>每齿根数模式</span>
+        <input id="wpPattern" type="text" value="2" title="布身穿筘循环，如 2 或 2,3"></label>
+      <div class="row">
+        <button id="wpSuggest" class="mini">按经密建议模式</button>
+      </div>
+      <div class="dim" id="wpReedInfo"></div>
+
+      <h4>边纱规则</h4>
+      <label class="field"><span>每侧边纱根数</span>
+        <input id="wpSelvEnds" type="number" min="0" max="120" step="1" value="0"></label>
+      <label class="field"><span>边纱每齿根数</span>
+        <input id="wpSelvPerDent" type="number" min="1" max="8" step="1" value="2"></label>
+      <label class="field"><span>边纱穿综</span>
+        <select id="wpSelvShaft">
+          <option value="adjacent">跟随相邻经纱</option>
+          <option value="alternate">综框 1/2 交替</option>
+        </select></label>
+
+      <h4>分束整经</h4>
+      <label class="field"><span>每束根数上限</span>
+        <input id="wpMaxBout" type="number" min="4" max="500" step="1" value="40"></label>
+      <div class="row">
+        <button id="wpAutoBouts" class="mini">自动分束（避开色界）</button>
+        <button id="wpOpenView" class="mini primary">逐根上机视图</button>
+      </div>
+      <div id="wpBoutList"></div>
+
+      <h4>整经 / 穿筘检查</h4>
+      <div class="issue-summary" id="warpIssueSummary">—</div>
+      <ul class="issuelist" id="warpIssueList"></ul>
+
+      <div class="row" style="margin-top:8px">
+        <button id="wpPrint" class="mini">打印整经操作单</button>
+      </div>
+    </div>
+
     <div class="tabpage" data-tab="projects">
       <h4>版本快照</h4>
       <div class="row">
@@ -246,6 +295,38 @@
     <div class="cmp-body">
       <div><h4 id="cmpTitleA">A</h4><canvas id="cvCmpA"></canvas></div>
       <div><h4 id="cmpTitleB">B</h4><canvas id="cvCmpB"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- 逐根上机视图窗口 -->
+<div id="warpModal" class="modal hidden">
+  <div class="modal-box xwide">
+    <div class="modal-head">
+      <span>逐根上机视图 —— 整经 · 穿综 · 穿筘</span>
+      <button id="warpClose" class="mini">关闭 (Esc)</button>
+    </div>
+    <div class="warp-toolbar">
+      <span class="tg-label">阶段</span>
+      <span id="warpStageBtns" class="seg">
+        <button data-stage="0" class="active">整经</button>
+        <button data-stage="1">穿综</button>
+        <button data-stage="2">穿筘</button>
+      </span>
+      <button id="warpDone" class="mini primary" title="快捷键：空格">✓ 标记完成并前进</button>
+      <button id="warpUndo" class="mini" title="快捷键：Backspace">↶ 回退</button>
+      <button id="warpNext" class="mini" title="跳到本阶段下一根未完成">⇥ 下一未完成</button>
+      <button id="warpLocate" class="mini" title="在原草图中定位当前经纱">⌖ 定位草图</button>
+      <label class="zoom">缩放 <input id="warpZoom" type="range" min="3" max="36" value="10"></label>
+      <button id="warpReset" class="mini" title="清空本阶段全部勾选">清零本阶段</button>
+    </div>
+    <div class="warpview-scroll" id="warpScroll">
+      <div class="warpview-spacer" id="warpSpacer"><canvas id="cvWarpPath"></canvas></div>
+    </div>
+    <div class="warp-statusbar">
+      <span id="warpCursorInfo">—</span>
+      <span id="warpProgText" class="dim"></span>
+      <span class="dim">键盘：←→ 移动 · ↑↓ 换阶段 · 1/2/3 勾选 · 空格 完成并前进 · Backspace 回退 · 双击定位草图</span>
     </div>
   </div>
 </div>

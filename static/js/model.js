@@ -13,7 +13,8 @@ import { makeMatrix, resizeMatrix, resizeArray } from "./utils.js";
  *   palette: ['#hex', ...],
  *   thresholds: { warp, weft },
  *   settings: { epc, ppc, repX, repY, width, length,
- *               warpTakeup, weftTakeup, wasteWarp, wasteWeft, warpTex, weftTex }
+ *               warpTakeup, weftTakeup, wasteWarp, wasteWeft, warpTex, weftTex },
+ *   warpPlan: 整经/穿筘计划（见 warp.js defaultWarpPlan；null 表示尚未设置）
  * }
  */
 export function createDraft(partial = {}) {
@@ -45,6 +46,7 @@ export function createDraft(partial = {}) {
       warpTex: 30, weftTex: 30,
       ...(partial.settings || {}),
     },
+    warpPlan: partial.warpPlan || null,
   };
 }
 

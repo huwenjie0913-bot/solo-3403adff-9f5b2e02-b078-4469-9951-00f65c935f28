@@ -2,6 +2,7 @@
 import { analyze } from "./weave.js";
 import { estimateYarn } from "./preview.js";
 import { formatTime, todayText } from "./utils.js";
+import { buildWarpSheet } from "./warpsheet.js";
 
 function makeSheetCanvas(cols, rows, cell) {
   const padL = 24, padT = 16;
@@ -197,6 +198,13 @@ export function buildPrintSheet(el, name, d, opts = {}) {
        空梭口：${a.emptyPicks.length ? "第 " + a.emptyPicks.map((p) => p + 1).join("、") + " 纬" : "无"}。
        浮长：经浮 ${a.warpFloats.length} 段，纬浮 ${a.weftFloats.length} 段（红框标于组织图）。</p>`;
   el.appendChild(notes);
+
+  // 已设置整经/穿筘计划时，附加操作单章节
+  if (d.warpPlan) {
+    const sec = document.createElement("div");
+    buildWarpSheet(sec, name, d, { section: true });
+    el.appendChild(sec);
+  }
 
   if (opts.standalone) {
     el.classList.add("sheet");

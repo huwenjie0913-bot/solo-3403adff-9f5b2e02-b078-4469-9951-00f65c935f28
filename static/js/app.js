@@ -8,6 +8,12 @@ import { exportWIF, importWIF } from "./wif.js";
 import { printDraft } from "./printsheet.js";
 import { renderDraftComposite, diffDrafts } from "./compare.js";
 import { api } from "./api.js";
+import {
+  computeWarpPlan, defaultWarpPlan, suggestDentPattern, dentsPerCm,
+  parsePattern, setBoutSize, ensureProgress, STAGES,
+} from "./warp.js";
+import { WarpView } from "./warpview.js";
+import { printWarpSheet } from "./warpsheet.js";
 
 // --------------------------------------------------------------------------- //
 // 状态
@@ -125,6 +131,10 @@ function rebuildFromDraft() {
   cWeft.activeColor = activeColor;
 
   syncSettingsInputs();
+  syncWarpInputs();
+  warpModel = null;
+  warpBoundsCustom = false;
+  warpHist.length = 0;
   renderPalette();
   recompute();
 }
@@ -182,6 +192,7 @@ function recompute() {
   renderPreviewSafe();
   renderYarn();
   renderSeqLengths();
+  renderWarpSafe();
 }
 
 // --------------------------------------------------------------------------- //
@@ -325,6 +336,301 @@ function syncSettingsInputs() {
   $("#inpWasteWeft").value = s.wasteWeft;
   $("#inpWarpTex").value = s.warpTex;
   $("#inpWeftTex").value = s.weftTex;
+}
+
+// --------------------------------------------------------------------------- //
+// 整经与穿筘规划（只读草稿数据，计划与进度存于 draft.warpPlan，随项目/版本保存）
+// --------------------------------------------------------------------------- //
+let warpModel = null;          // 当前计算结果
+let warpView = null;           // 逐根上机视图组件
+let warpStageIdx = 0;          // 当前勾选阶段（STAGES 下标）
+let warpBoundsCustom = false;  // 用户是否手动调过束界（未手动时随上限自动重排）
+const warpHist = [];           // 勾选历史（回退修正用）
+
+function ensureWarpPlan() {
+  if (!draft.warpPlan) {
+    const wp = defaultWarpPlan();
+    const epc = +draft.settings.epc || 10;
+    wp.reedDensity = Math.max(1, Math.round(epc / 2 * 2) / 2);   // 默认每齿 2 根起步
+    wp.dentPattern = suggestDentPattern(epc, dentsPerCm(wp));
+    draft.warpPlan = wp;
+    markDirty();
+  }
+  return draft.warpPlan;
+}
+
+function recalcWarp() {
+  const wp = ensureWarpPlan();
+  warpModel = computeWarpPlan(draft);
+  wp.boutBounds = warpModel.bounds.slice();   // 自动边界写回，便于手动微调
+  const m = warpModel;
+  $("#warpSource").textContent =
+    `布身 ${m.totals.bodyEnds} 根（幅宽 ${draft.settings.width} cm × 经密 ${draft.settings.epc}）` +
+    (m.selv ? ` ＋ 边纱 ${m.selv}×2` : "") +
+    ` ＝ 总经 ${m.totals.totalEnds} 根 · 组织循环 ${draft.ends} 根 · ` +
+    `单根长 ${m.totals.warpLenEach.toFixed(1)} cm（含缩率回丝）`;
+  $("#wpReedInfo").textContent = m.dpc > 0
+    ? `筘 ${m.dpc.toFixed(2)} 齿/cm · 布身 ${m.bodyDents} 齿（平均 ${m.avgPerDent.toFixed(2)} 根/齿）· ` +
+      `实际经密 ${m.actualEpc.toFixed(2)} 根/cm（偏差 ${m.devPct >= 0 ? "+" : ""}${m.devPct.toFixed(1)}%）· ` +
+      `全幅 ${m.totalDents} 齿 ≈ 筘幅 ${m.reedWidthCm.toFixed(1)} cm`
+    : "请设置有效筘密。";
+  renderBoutList();
+  renderWarpIssues();
+}
+
+function renderWarpSafe() {
+  const tabActive = $(".tabpage[data-tab='warp']").classList.contains("active");
+  const modalOpen = !$("#warpModal").classList.contains("hidden");
+  if (tabActive || modalOpen) {
+    recalcWarp();
+    if (modalOpen && warpView) {
+      const wp = ensureWarpPlan();
+      const prog = ensureProgress(wp, warpModel.totals.totalEnds);
+      warpView.setModel(warpModel, draft.palette, prog);
+      updateWarpStatus();
+    }
+  } else {
+    warpModel = null;   // 草稿已变，下次打开标签页时重算
+  }
+}
+
+function syncWarpInputs() {
+  const wp = draft.warpPlan;
+  if (!wp) return;
+  $("#wpReed").value = wp.reedDensity;
+  $("#wpReedUnit").value = wp.reedUnit;
+  $("#wpPattern").value = (wp.dentPattern || []).join(",");
+  $("#wpSelvEnds").value = wp.selvEnds;
+  $("#wpSelvPerDent").value = wp.selvPerDent;
+  $("#wpSelvShaft").value = wp.selvShaft;
+  $("#wpMaxBout").value = wp.maxBout;
+}
+
+function renderBoutList() {
+  const m = warpModel;
+  const box = $("#wpBoutList");
+  box.innerHTML = "";
+  const tbl = document.createElement("table");
+  tbl.className = "bout-table";
+  tbl.innerHTML = `<thead><tr><th>束</th><th>经纱范围</th><th>根数</th><th>分色</th><th>用量</th></tr></thead>`;
+  const tb = document.createElement("tbody");
+  m.bouts.forEach((bt, k) => {
+    const tr = document.createElement("tr");
+    const chips = Object.keys(bt.colors).map((ci) =>
+      `<span class="chip" style="background:${draft.palette[ci] || "#ccc"}"></span>${bt.colors[ci]}`).join(" ");
+    tr.innerHTML = `<td>${k + 1}</td><td class="dim">${bt.start + 1}–${bt.end}</td><td></td>` +
+      `<td>${chips}</td><td class="dim">${bt.totalM.toFixed(1)} m · ${bt.weightG.toFixed(1)} g</td>`;
+    const tdN = tr.children[2];
+    if (k < m.bouts.length - 1) {
+      const inp = document.createElement("input");
+      inp.type = "number"; inp.min = 1; inp.max = m.totals.totalEnds - 1; inp.value = bt.count;
+      inp.title = "调整本束根数（下一束相应变化），即时重算";
+      inp.addEventListener("change", () => {
+        warpBoundsCustom = true;
+        draft.warpPlan.boutBounds = setBoutSize(m.bounds, k, +inp.value || bt.count, m.totals.totalEnds);
+        markDirty();
+        recalcWarp();
+      });
+      tdN.appendChild(inp);
+    } else {
+      tdN.textContent = bt.count;
+      tdN.classList.add("dim");
+      tdN.title = "末束根数由总根数决定";
+    }
+    tr.title = "点击在逐根上机视图中查看本束";
+    tr.addEventListener("click", (e) => {
+      if (e.target.tagName !== "INPUT") openWarpView(bt.start);
+    });
+    tb.appendChild(tr);
+  });
+  tbl.appendChild(tb);
+  box.appendChild(tbl);
+  const sum = document.createElement("div");
+  sum.className = "dim bout-sum";
+  sum.textContent = `共 ${m.bouts.length} 束 · 总经 ${m.totals.totalEnds} 根 · ` +
+    `合计 ${m.totals.totalM.toFixed(1)} m · ${m.totals.weightG.toFixed(1)} g`;
+  box.appendChild(sum);
+}
+
+function renderWarpIssues() {
+  const m = warpModel;
+  const ul = $("#warpIssueList");
+  const sum = $("#warpIssueSummary");
+  ul.innerHTML = "";
+  if (!m.issues.length) {
+    sum.className = "issue-summary ok";
+    sum.textContent = "✓ 密度、筘齿、束界与边纱检查通过。";
+    return;
+  }
+  const errs = m.issues.filter((i) => i.level === "error").length;
+  sum.className = "issue-summary warn";
+  sum.textContent = `发现 ${errs} 个错误、${m.issues.length - errs} 个提醒，共 ${m.issues.length} 项。点击条目在上机视图中定位。`;
+  m.issues.forEach((iss) => {
+    const li = document.createElement("li");
+    li.className = iss.level === "error" ? "error" : iss.level === "info" ? "info" : "warn";
+    const ico = iss.level === "error" ? "⛔" : iss.level === "info" ? "ℹ️" : "⚠️";
+    li.innerHTML = `<span class="ico">${ico}</span><span>${iss.msg}</span>`;
+    if (iss.end != null) {
+      li.title = "点击在上机视图中定位";
+      li.addEventListener("click", () => openWarpView(iss.end));
+    }
+    ul.appendChild(li);
+  });
+}
+
+// ---- 逐根上机视图 ----
+function openWarpView(at = null) {
+  const wp = ensureWarpPlan();
+  if (!warpModel) recalcWarp();
+  const before = wp.progress;
+  const prog = ensureProgress(wp, warpModel.totals.totalEnds);
+  if (wp.progress !== before) markDirty();
+  $("#warpModal").classList.remove("hidden");
+  if (!warpView) {
+    warpView = new WarpView({
+      canvas: $("#cvWarpPath"),
+      scroller: $("#warpScroll"),
+      spacer: $("#warpSpacer"),
+      onToggle: toggleWarpStage,
+      onCursor: (i) => { wp.progress.cursor = i; markDirty(); updateWarpStatus(); },
+      onLocate: (i) => locateEndInDraft(i),
+    });
+    warpView.cw = +$("#warpZoom").value || 10;
+  }
+  warpView.stage = warpStageIdx;
+  warpView.setModel(warpModel, draft.palette, prog);
+  // 续接上次进度：优先跳到指定位置，否则用上次光标；若该根本阶段已完成则找下一未完成
+  let cur = at != null ? at : prog.cursor;
+  const arr = prog[STAGES[warpStageIdx].key];
+  if (at == null && arr[cur]) {
+    const nxt = arr.findIndex((v) => !v);
+    if (nxt >= 0) cur = nxt;
+  }
+  warpView.setCursor(cur);
+  updateWarpStatus();
+  requestAnimationFrame(() => { warpView.resize(); warpView.ensureVisible(); warpView.draw(); });
+  setStatus("逐根上机视图：←→ 移动，1/2/3 勾选，空格完成并前进，Backspace 回退");
+}
+
+function closeWarpView() {
+  $("#warpModal").classList.add("hidden");
+}
+
+function toggleWarpStage(end, key) {
+  const wp = ensureWarpPlan();
+  const prog = ensureProgress(wp, warpModel.totals.totalEnds);
+  warpHist.push({ end, key, prev: prog[key][end] });
+  if (warpHist.length > 500) warpHist.shift();
+  prog[key][end] = !prog[key][end];
+  markDirty();
+  if (warpView) warpView.draw();
+  updateWarpStatus();
+}
+
+function warpMarkDone() {
+  if (!warpView || !warpModel) return;
+  const wp = ensureWarpPlan();
+  const prog = ensureProgress(wp, warpModel.totals.totalEnds);
+  const key = STAGES[warpStageIdx].key;
+  const cur = warpView.cursor;
+  if (!prog[key][cur]) toggleWarpStage(cur, key);
+  const arr = prog[key];
+  let nxt = -1;
+  for (let i = cur + 1; i < arr.length; i++) if (!arr[i]) { nxt = i; break; }
+  if (nxt < 0) nxt = arr.findIndex((v) => !v);
+  if (nxt >= 0) warpView.setCursor(nxt);
+  else setStatus(`「${STAGES[warpStageIdx].label}」已全部完成`);
+}
+
+function warpUndo() {
+  const h = warpHist.pop();
+  if (!h) { setStatus("没有可回退的勾选"); return; }
+  const prog = ensureProgress(ensureWarpPlan(), warpModel.totals.totalEnds);
+  prog[h.key][h.end] = h.prev;
+  markDirty();
+  if (warpView) { warpView.setCursor(h.end, false); warpView.draw(); }
+  updateWarpStatus();
+  setStatus(`已回退：第 ${h.end + 1} 根「${STAGES.find((s) => s.key === h.key).label}」`);
+}
+
+function warpNextIncomplete() {
+  if (!warpView || !warpModel) return;
+  const prog = ensureProgress(ensureWarpPlan(), warpModel.totals.totalEnds);
+  const arr = prog[STAGES[warpStageIdx].key];
+  let nxt = -1;
+  for (let i = warpView.cursor + 1; i < arr.length; i++) if (!arr[i]) { nxt = i; break; }
+  if (nxt < 0) nxt = arr.findIndex((v) => !v);
+  if (nxt >= 0) warpView.setCursor(nxt);
+  else setStatus(`「${STAGES[warpStageIdx].label}」已全部完成`);
+}
+
+function warpResetStage() {
+  const wp = ensureWarpPlan();
+  if (!wp.progress) return;
+  const st = STAGES[warpStageIdx];
+  if (!confirm(`清空「${st.label}」阶段全部勾选？`)) return;
+  wp.progress[st.key].fill(false);
+  markDirty();
+  if (warpView) warpView.draw();
+  updateWarpStatus();
+}
+
+function setWarpStage(i) {
+  warpStageIdx = i;
+  if (warpView) { warpView.stage = i; warpView.draw(); }
+  updateWarpStatus();
+}
+
+function updateWarpStatus() {
+  if (!warpModel || !draft.warpPlan || !draft.warpPlan.progress) return;
+  const m = warpModel, prog = draft.warpPlan.progress;
+  const total = m.totals.totalEnds;
+  $("#warpProgText").textContent = STAGES.map((s) => {
+    const n = prog[s.key].filter(Boolean).length;
+    return `${s.label} ${n}/${total}`;
+  }).join(" · ");
+  const e = m.ends[warpView ? warpView.cursor : prog.cursor];
+  if (e) {
+    $("#warpCursorInfo").textContent = `第 ${e.i + 1} 根` +
+      (e.zone === "B" ? `（布身第 ${e.bodyIdx + 1} 根）` : e.zone === "L" ? "（左边纱）" : "（右边纱）") +
+      ` · 色 ${e.color + 1} · ${e.shaft >= 0 ? "综 " + (e.shaft + 1) : "未穿综"} · 齿 ${m.dentOfEnd[e.i] + 1}`;
+  }
+  $$("#warpStageBtns button").forEach((b, i) => b.classList.toggle("active", i === warpStageIdx));
+}
+
+/** 从上机视图定位到原草图对应经纱（穿综格 + 组织图列 + 经纱色条） */
+function locateEndInDraft(endIdx) {
+  const m = warpModel;
+  if (!m) return;
+  const e = m.ends[endIdx];
+  if (!e) return;
+  closeWarpView();
+  const col = e.zone === "B" ? e.bodyIdx % draft.ends : (e.zone === "L" ? 0 : draft.ends - 1);
+  const row = e.shaft >= 0 ? e.shaft : 0;
+  gThread.locate(row, col);
+  gDraw.locate(0, col);
+  cWarp.locate(col);
+  setStatus(`已定位第 ${endIdx + 1} 根经纱 → 草图第 ${col + 1} 列` +
+    (e.zone !== "B" ? "（边纱，对应布身边缘）" : ""));
+}
+
+/** 上机视图键盘控制；返回 true 表示该键已处理/应吞掉 */
+function handleWarpKey(e) {
+  if (!warpView) return false;
+  const tag = (e.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "select" || tag === "textarea") return false;
+  const k = e.key;
+  if (k === "Escape") { closeWarpView(); return true; }
+  if (k === "ArrowLeft") { warpView.setCursor(warpView.cursor - 1); return true; }
+  if (k === "ArrowRight") { warpView.setCursor(warpView.cursor + 1); return true; }
+  if (k === "ArrowUp") { setWarpStage((warpStageIdx + 2) % 3); return true; }
+  if (k === "ArrowDown") { setWarpStage((warpStageIdx + 1) % 3); return true; }
+  if (k === "1" || k === "2" || k === "3") { toggleWarpStage(warpView.cursor, STAGES[+k - 1].key); return true; }
+  if (k === " " || k === "Enter") { warpMarkDone(); return true; }
+  if (k === "Backspace") { warpUndo(); return true; }
+  // 模态打开时吞掉普通字符，避免误触主界面画笔快捷键
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && k.length === 1) return true;
+  return false;
 }
 
 // --------------------------------------------------------------------------- //
@@ -739,6 +1045,58 @@ function bind() {
   numSetting("#inpWarpTex", "warpTex", renderYarn, "调整经纱线密度");
   numSetting("#inpWeftTex", "weftTex", renderYarn, "调整纬纱线密度");
 
+  // 整经与穿筘：输入即时重算（计划存于 draft.warpPlan，不占草图撤销栈）
+  const wpInput = (sel, apply) => {
+    const el = $(sel);
+    const evt = el.tagName === "SELECT" || el.type === "text" ? "change" : "input";
+    el.addEventListener(evt, () => { apply(ensureWarpPlan(), el); markDirty(); recalcWarp(); });
+  };
+  wpInput("#wpReed", (wp, el) => { wp.reedDensity = +el.value; });
+  wpInput("#wpReedUnit", (wp, el) => { wp.reedUnit = el.value; });
+  wpInput("#wpPattern", (wp, el) => {
+    wp.dentPattern = parsePattern(el.value, wp.dentPattern);
+    el.value = wp.dentPattern.join(",");
+  });
+  wpInput("#wpSelvEnds", (wp, el) => { wp.selvEnds = Math.max(0, +el.value | 0); });
+  wpInput("#wpSelvPerDent", (wp, el) => { wp.selvPerDent = Math.max(1, +el.value | 0); });
+  wpInput("#wpSelvShaft", (wp, el) => { wp.selvShaft = el.value; });
+  wpInput("#wpMaxBout", (wp, el) => {
+    wp.maxBout = Math.max(4, +el.value | 0);
+    if (!warpBoundsCustom) wp.boutBounds = null;   // 未手动调过束界时随上限自动重排
+  });
+  $("#wpSuggest").onclick = () => {
+    const wp = ensureWarpPlan();
+    wp.dentPattern = suggestDentPattern(+draft.settings.epc || 1, dentsPerCm(wp));
+    $("#wpPattern").value = wp.dentPattern.join(",");
+    markDirty();
+    recalcWarp();
+    setStatus(`已按经密建议穿筘模式：${wp.dentPattern.join("、")} 根/齿`);
+  };
+  $("#wpAutoBouts").onclick = () => {
+    const wp = ensureWarpPlan();
+    wp.boutBounds = null;
+    warpBoundsCustom = false;
+    markDirty();
+    recalcWarp();
+    setStatus("已按色序自动分束（避开颜色变化处）");
+  };
+  $("#wpOpenView").onclick = () => openWarpView();
+  $("#wpPrint").onclick = () => { ensureWarpPlan(); printWarpSheet(draft.name, draft); };
+
+  // 逐根上机视图
+  $("#warpClose").onclick = closeWarpView;
+  $("#warpDone").onclick = warpMarkDone;
+  $("#warpUndo").onclick = warpUndo;
+  $("#warpNext").onclick = warpNextIncomplete;
+  $("#warpReset").onclick = warpResetStage;
+  $("#warpLocate").onclick = () => warpView && locateEndInDraft(warpView.cursor);
+  $("#warpZoom").oninput = (e) => { if (warpView) warpView.setZoom(+e.target.value); };
+  $$("#warpStageBtns button").forEach((b) =>
+    b.addEventListener("click", () => setWarpStage(+b.dataset.stage)));
+  window.addEventListener("resize", () => {
+    if (warpView && !$("#warpModal").classList.contains("hidden")) warpView.resize();
+  });
+
   // 标签页（切换时补渲染）
   $$(".tabs .tab").forEach((t) =>
     t.addEventListener("click", () => {
@@ -748,6 +1106,7 @@ function bind() {
       $(`.tabpage[data-tab="${t.dataset.tab}"]`).classList.add("active");
       if (t.dataset.tab === "preview") renderPreviewSafe();
       if (t.dataset.tab === "yarn") renderYarn();
+      if (t.dataset.tab === "warp") { ensureWarpPlan(); syncWarpInputs(); recalcWarp(); }
       if (t.dataset.tab === "projects") { refreshVersions(); refreshProjectLists(); }
     }));
 
@@ -771,6 +1130,11 @@ function bind() {
 
   // 快捷键
   window.addEventListener("keydown", (e) => {
+    // 上机视图打开时，键盘交给视图控制
+    if (!$("#warpModal").classList.contains("hidden")) {
+      if (handleWarpKey(e)) e.preventDefault();
+      return;
+    }
     if (!(e.ctrlKey || e.metaKey)) {
       const tag = (e.target.tagName || "").toLowerCase();
       if (tag === "input" || tag === "select" || tag === "textarea") return;

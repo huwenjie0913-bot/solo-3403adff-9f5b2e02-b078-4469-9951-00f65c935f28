@@ -291,6 +291,36 @@ canvas { display: block; }
   box-shadow: 0 14px 50px rgba(0,0,0,.3);
 }
 .modal-box.wide { width: 980px; }
+.modal-box.xwide { width: 1180px; max-width: 96vw; }
+
+/* ---------- 整经与穿筘 ---------- */
+.bout-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+.bout-table th, .bout-table td { border: 1px solid #e3e8ed; padding: 3px 5px; text-align: left; }
+.bout-table th { background: #f5f8fb; color: #566575; font-weight: 600; }
+.bout-table tbody tr { cursor: pointer; }
+.bout-table tbody tr:hover { background: #f2f7fc; }
+.bout-table input[type="number"] { width: 58px; padding: 1px 4px; }
+.bout-table .chip { display: inline-block; width: 9px; height: 9px; border-radius: 2px; border: 1px solid rgba(0,0,0,.25); margin: 0 2px 0 6px; vertical-align: -1px; }
+.bout-sum { margin-top: 5px; }
+
+.warp-toolbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; border-bottom: 1px solid #edf0f3;
+}
+.tg-label { font-size: 12px; color: #566575; }
+.seg { display: inline-flex; border: 1px solid #c3ccd4; border-radius: 5px; overflow: hidden; }
+.seg button { border: none; border-radius: 0; padding: 3px 12px; }
+.seg button.active { background: #3d7ab8; color: #fff; }
+.warp-toolbar .zoom { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #566575; }
+.warpview-scroll { overflow: auto; max-height: 42vh; background: #fff; position: relative; }
+.warpview-spacer { position: relative; }
+#cvWarpPath { position: sticky; left: 0; top: 0; display: block; cursor: pointer; }
+.warp-statusbar {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap;
+  padding: 6px 12px; font-size: 12px; border-top: 1px solid #edf0f3;
+}
+#warpCursorInfo { font-weight: 600; color: #33404c; }
 .modal-head {
   display: flex; justify-content: space-between; align-items: center;
   padding: 10px 14px;
@@ -317,7 +347,9 @@ canvas { display: block; }
     overflow: visible;
   }
   #printArea h1 { font-size: 18px; margin: 0 0 8px; }
+  #printArea h2 { font-size: 14px; margin: 12px 0 4px; }
   #printArea h3 { font-size: 12px; margin: 10px 0 4px; }
+  #printArea ol { margin: 4px 0 8px; padding-left: 22px; }
   #printArea table { border-collapse: collapse; margin: 4px 0 8px; }
   #printArea th, #printArea td { border: 1px solid #999; padding: 2px 7px; text-align: left; }
   #printArea th { background: #f0f0f0; }
