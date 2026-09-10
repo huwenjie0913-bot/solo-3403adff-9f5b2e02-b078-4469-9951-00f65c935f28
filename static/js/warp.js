@@ -145,6 +145,8 @@ export function computeWarpPlan(draft) {
 
   // 单根长度（与用纱估算一致）：成品长 / (1-经缩) + 上机回丝
   const warpLenEach = (+s.length || 0) / (1 - (+s.warpTakeup || 0) / 100) + (+s.wasteWarp || 0);
+  // tex = g/km：根数 × 单根长(cm) ÷ 100000 → km，× tex → g
+  const weightOfEnds = (n) => n * warpLenEach / 100000 * tex;
 
   const wrap = (bi) => ((bi % E) + E) % E;
   const colorOf = (bi) => draft.warpColors[wrap(bi)] ?? 0;
@@ -226,7 +228,7 @@ export function computeWarpPlan(draft) {
       startDent: dentOfEnd[st] + 1,
       lenEach: warpLenEach,
       totalM: count * warpLenEach / 100,
-      weightG: count * warpLenEach / 1000 * tex,
+      weightG: weightOfEnds(count),
     });
   }
 
@@ -321,12 +323,12 @@ export function computeWarpPlan(draft) {
   const totals = {
     totalEnds, bodyEnds, selv, warpLenEach,
     totalM: totalEnds * warpLenEach / 100,
-    weightG: totalEnds * warpLenEach / 1000 * tex,
+    weightG: weightOfEnds(totalEnds),
     byColor: byColor
       .map((n, ci) => (n ? {
         color: ci, ends: n,
         lengthM: n * warpLenEach / 100,
-        weightG: n * warpLenEach / 1000 * tex,
+        weightG: weightOfEnds(n),
       } : null))
       .filter(Boolean),
   };
